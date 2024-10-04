@@ -2,7 +2,6 @@ package main
 
 import (
 	"database/sql"
-	"fmt"
 )
 
 type ParcelStore struct {
@@ -45,8 +44,7 @@ func (s ParcelStore) Get(number int) (Parcel, error) {
 
 	// Отладка:
 	if err != nil {
-		// Отладка:
-		fmt.Println("Ошибка в функции Get:", err)
+		return Parcel{}, err
 	}
 
 	return p, err
@@ -69,11 +67,14 @@ func (s ParcelStore) GetByClient(client int) ([]Parcel, error) {
 		p := Parcel{}
 		err := rows.Scan(&p.Number, &p.Client, &p.Status, &p.Address, &p.CreatedAt)
 		if err != nil {
-			fmt.Println("Ошибка в функции GetByClient:", err)
 			return nil, err
 		}
-
 		res = append(res, p)
+	}
+
+	err = rows.Err()
+	if err != nil {
+		return nil, err
 	}
 
 	return res, err
@@ -93,46 +94,20 @@ func (s ParcelStore) SetAddress(number int, address string) error {
 
 	// Обновление адреса в таблице parcel:
 	// Проверим, имеет ли статус записи с номером number значение registered:
-	p := Parcel{}
-	row := s.db.QueryRow("SELECT status FROM parcel WHERE number = :number",
-		sql.Named("number", number))
-	err := row.Scan(&p.Status)
-	if err != nil {
-		// Отладка:
-		fmt.Println("Ошибка в функции SetAddress:", err)
-		return err
-	}
-
 	// Если условние соблюдено, обновим адрес в таблице parcel:
-	if p.Status == ParcelStatusRegistered {
-		_, err := s.db.Exec("UPDATE parcel SET address = :address WHERE number = :number",
-			sql.Named("address", address),
-			sql.Named("number", number))
-		return err
-	}
-
+	_, err := s.db.Exec("UPDATE parcel SET address = :address WHERE number = :number AND status = :status",
+		sql.Named("address", address),
+		sql.Named("number", number),
+		sql.Named("status", ParcelStatusRegistered))
 	return err
 }
 
 func (s ParcelStore) Delete(number int) error {
 	// Удаление строки из таблицы parcel:
 	// Проверим, имеет ли статус записи с номером number значение registered:
-	p := Parcel{}
-	rows := s.db.QueryRow("SELECT status FROM parcel WHERE number = :number",
-		sql.Named("number", number))
-	err := rows.Scan(&p.Status)
-	if err != nil {
-		// Отладка:
-		fmt.Println("Ошибка в функции Delete:", err)
-		return err
-	}
-
 	// Если условние соблюдено, удалим строку в таблице parcel:
-	if p.Status == ParcelStatusRegistered {
-		_, err := s.db.Exec("DELETE FROM parcel WHERE number = :number",
-			sql.Named("number", number))
-		return err
-	}
-
-	return nil
+	_, err := s.db.Exec("DELETE FROM parcel WHERE number = :number AND status = :status",
+		sql.Named("number", number),
+		sql.Named("status", ParcelStatusRegistered))
+	return err
 }
